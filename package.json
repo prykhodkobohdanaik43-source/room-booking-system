@@ -1,0 +1,42 @@
+{
+  "name": "room-booking-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Система бронювання переговорних кімнат в офісі",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "src/backend",
+    "src/frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w src/backend\" \"npm run dev -w src/frontend\"",
+    "dev:backend": "npm run dev -w src/backend",
+    "dev:frontend": "npm run dev -w src/frontend",
+    "build": "npm run build -w src/frontend",
+    "start": "npm start -w src/backend",
+    "db:migrate": "npm run db:migrate -w src/backend",
+    "db:seed": "npm run db:seed -w src/backend",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "concurrently": "^10.0.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "jsdom": "^30.1.0",
+    "prettier": "^3.9.8",
+    "supertest": "^7.2.2",
+    "vitest": "^5.0.1"
+  }
+}
