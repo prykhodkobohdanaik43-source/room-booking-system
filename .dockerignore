@@ -1,0 +1,5 @@
+node_modules
+src/frontend/dist
+coverage
+.git
+.env
