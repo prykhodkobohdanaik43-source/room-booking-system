@@ -1,0 +1,4 @@
+node_modules
+src/frontend/dist
+coverage
+package-lock.json
