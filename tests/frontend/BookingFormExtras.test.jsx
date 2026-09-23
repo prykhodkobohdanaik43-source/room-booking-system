@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../src/frontend/src/api/ApiError.js';
+import { addDays, toIsoDay } from '../../src/frontend/src/format.js';
 import { BookingFormPage, defaultSlot } from '../../src/frontend/src/pages/BookingFormPage.jsx';
 import { renderWithContext } from './renderWithContext.jsx';
 
@@ -103,12 +104,13 @@ describe('BookingFormPage: серія щотижневих броней (ФВ-24
   });
 });
 
-describe('BookingFormPage: редагування (ФВ-07)', () => {
-  const booking = {
-    id: 'b1',
-    roomId: 'r1',
-    startTime: '2026-09-22T10:00:00',
-    endTime: '2026-09-22T11:00:00',
+   describe('BookingFormPage: редагування (ФВ-07)', () => {
+     const day = toIsoDay(addDays(new Date(), 1));
+     const booking = {
+       id: 'b1',
+       roomId: 'r1',
+       startTime: `${day}T10:00:00`,
+       endTime: `${day}T11:00:00`,
     participantsCount: 3,
     status: 'ACTIVE',
   };
