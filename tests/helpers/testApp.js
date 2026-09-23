@@ -22,10 +22,10 @@ export function onDay(dayOffset, hours = 10, minutes = 0) {
   return new Date(2026, 8, 21 + dayOffset, hours, minutes, 0);
 }
 
-export async function createTestApp({ now = MONDAY_9AM } = {}) {
+export async function createTestApp({ now = MONDAY_9AM, env = {} } = {}) {
   const clock = new FixedClock(now);
   const channel = new RecordingChannel();
-  const config = loadConfig({ NODE_ENV: 'test', JWT_SECRET: 'test-secret' });
+  const config = loadConfig({ NODE_ENV: 'test', JWT_SECRET: 'test-secret', ...env });
   const container = buildContainer(config, {
     clock,
     channel,

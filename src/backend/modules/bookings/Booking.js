@@ -5,6 +5,18 @@ import { BookingStatus, OCCUPYING_STATUSES } from './BookingStatus.js';
 
 export const ARRIVAL_WINDOW_MINUTES = 10;
 
+// ФВ-04, ФВ-05: одні й ті самі перевірки полів для створення і редагування броні
+function normalizeFields({ roomId, startTime, endTime, participantsCount }) {
+  const start = parseDate(startTime);
+  const end = parseDate(endTime);
+  if (!roomId) throw new ValidationError('Оберіть кімнату');
+  if (!start || !end) throw new ValidationError('Вкажіть час початку і завершення');
+  if (!Number.isInteger(participantsCount) || participantsCount < 1) {
+    throw new ValidationError('Вкажіть кількість учасників — ціле число від 1');
+  }
+  return { roomId, startTime: start, endTime: end, participantsCount };
+}
+
 export class Booking {
   constructor({
     id = null,
@@ -34,14 +46,8 @@ export class Booking {
 
   // ФВ-04, ФВ-05
   static create({ roomId, authorId, startTime, endTime, participantsCount }, now) {
-    const start = parseDate(startTime);
-    const end = parseDate(endTime);
-    if (!roomId) throw new ValidationError('Оберіть кімнату');
-    if (!start || !end) throw new ValidationError('Вкажіть час початку і завершення');
-    if (!Number.isInteger(participantsCount) || participantsCount < 1) {
-      throw new ValidationError('Вкажіть кількість учасників — ціле число від 1');
-    }
-    return new Booking({ roomId, authorId, startTime: start, endTime: end, participantsCount, createdAt: now });
+    const fields = normalizeFields({ roomId, startTime, endTime, participantsCount });
+    return new Booking({ ...fields, authorId, createdAt: now });
   }
 
   get occupiesSlot() {
@@ -78,6 +84,31 @@ export class Booking {
     this.status = BookingStatus.CANCELLED;
     this.cancelReason = byAuthor ? null : text;
     this.cancelledBy = initiator.id;
+  }
+
+  // ФВ-07, ФВ-28: редагувати можна лише власну бронь і лише до її початку
+  reschedule(changes, initiator, now) {
+    this.#assertActive();
+    if (initiator.id !== this.authorId) throw new ForbiddenError('Редагувати можна лише власну бронь');
+    if (this.hasStarted(now)) throw new ConflictError('Бронь уже почалася, редагувати її не можна', 'BOOKING_STARTED');
+
+    const fields = normalizeFields({
+      roomId: changes.roomId ?? this.roomId,
+      startTime: changes.startTime ?? this.startTime,
+      endTime: changes.endTime ?? this.endTime,
+      participantsCount: changes.participantsCount ?? this.participantsCount,
+    });
+    Object.assign(this, fields);
+    // після зміни часу нагадування має надійти знову
+    this.reminderSentAt = null;
+  }
+
+  // ФВ-26: скасування системою (деактивація кімнати); ініціатора-користувача немає
+  cancelBySystem(reason) {
+    this.#assertActive();
+    this.status = BookingStatus.CANCELLED;
+    this.cancelReason = String(reason ?? '').trim();
+    this.cancelledBy = null;
   }
 
   // ФВ-08

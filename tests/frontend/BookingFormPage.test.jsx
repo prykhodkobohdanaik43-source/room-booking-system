@@ -12,7 +12,7 @@ const rooms = [
 ];
 
 function renderForm(createBooking) {
-  const api = { rooms: async () => rooms, createBooking };
+  const api = { rooms: async () => rooms, createBooking, bookingWarnings: async () => ({ warnings: [] }) };
   render(
     <MemoryRouter>
       <AuthContext.Provider value={{ api, user: { id: 'u1', role: 'EMPLOYEE' }, loading: false }}>

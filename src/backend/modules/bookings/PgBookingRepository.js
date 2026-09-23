@@ -63,6 +63,30 @@ export class PgBookingRepository extends BookingRepository {
     return toBooking(rows[0]);
   }
 
+  async updateSchedule(booking) {
+    try {
+      const { rows } = await this.pool.query(
+        `UPDATE bookings
+            SET room_id = $2, start_time = $3, end_time = $4, participants_count = $5, reminder_sent_at = $6
+          WHERE id = $1 AND status = 'ACTIVE'
+          RETURNING *`,
+        [
+          booking.id,
+          booking.roomId,
+          booking.startTime,
+          booking.endTime,
+          booking.participantsCount,
+          booking.reminderSentAt,
+        ],
+      );
+      if (rows.length === 0) throw new ConflictError('Бронь уже змінено', 'BOOKING_NOT_ACTIVE');
+      return toBooking(rows[0]);
+    } catch (err) {
+      if (err.code === EXCLUSION_VIOLATION) throw new SlotTakenError();
+      throw err;
+    }
+  }
+
   async findById(id) {
     const { rows } = await this.pool.query('SELECT * FROM bookings WHERE id = $1', [id]);
     return toBooking(rows[0]);
@@ -92,6 +116,44 @@ export class PgBookingRepository extends BookingRepository {
         WHERE status = 'ACTIVE' AND reminder_sent_at IS NULL AND start_time > $1 AND start_time <= $2
         ORDER BY start_time`,
       [from, to],
+    );
+    return rows.map(toBooking);
+  }
+
+  async findByAuthor(authorId, from) {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM bookings
+        WHERE author_id = $1 AND status IN ('ACTIVE', 'CONFIRMED') AND end_time > $2
+        ORDER BY start_time`,
+      [authorId, from],
+    );
+    return rows.map(toBooking);
+  }
+
+  async findUpcoming(from) {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM bookings
+        WHERE status IN ('ACTIVE', 'CONFIRMED') AND end_time > $1
+        ORDER BY start_time`,
+      [from],
+    );
+    return rows.map(toBooking);
+  }
+
+  async findByPeriod(from, to) {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM bookings WHERE start_time >= $1 AND start_time < $2 ORDER BY start_time, created_at`,
+      [from, to],
+    );
+    return rows.map(toBooking);
+  }
+
+  async findActiveByRoom(roomId, from, to) {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM bookings
+        WHERE room_id = $1 AND status = 'ACTIVE' AND start_time >= $2 AND start_time < $3
+        ORDER BY start_time`,
+      [roomId, from, to],
     );
     return rows.map(toBooking);
   }

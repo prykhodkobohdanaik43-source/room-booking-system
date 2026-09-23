@@ -14,6 +14,7 @@ import { BookingService } from './modules/bookings/BookingService.js';
 import { InMemoryBookingRepository } from './modules/bookings/InMemoryBookingRepository.js';
 import { PgBookingRepository } from './modules/bookings/PgBookingRepository.js';
 import { defaultBookingRules } from './modules/bookings/rules/index.js';
+import { EventLogController } from './modules/eventlog/EventLogController.js';
 import { EventLogService } from './modules/eventlog/EventLogService.js';
 import { InMemoryEventLogRepository } from './modules/eventlog/InMemoryEventLogRepository.js';
 import { PgEventLogRepository } from './modules/eventlog/PgEventLogRepository.js';
@@ -41,6 +42,7 @@ export function createMemoryStorage() {
     rooms: new InMemoryRoomRepository(),
     bookings: new InMemoryBookingRepository(),
     eventLog: new InMemoryEventLogRepository(),
+    ping: async () => true,
     close: async () => {},
   };
 }
@@ -53,6 +55,7 @@ export function createPgStorage(databaseUrl) {
     rooms: new PgRoomRepository(pool),
     bookings: new PgBookingRepository(pool),
     eventLog: new PgEventLogRepository(pool),
+    ping: async () => (await pool.query('SELECT 1')).rowCount === 1,
     close: () => pool.end(),
   };
 }
@@ -102,9 +105,13 @@ export function buildContainer(config = loadConfig(), overrides = {}) {
     notifications,
     clock,
     rules: defaultBookingRules(config.booking),
+    horizonDays: config.booking.horizonDays,
     reminderMinutes: config.booking.reminderMinutes,
     logger,
   });
+
+  // ФВ-26: скасування броней при деактивації кімнати; Rooms про модуль Bookings нічого не знає
+  roomService.addDeactivationListener(bookingService);
 
   const tickMs = config.scheduler.tickSeconds * 1000;
   const scheduler = new Scheduler({ logger })
@@ -123,6 +130,7 @@ export function buildContainer(config = loadConfig(), overrides = {}) {
       users: new UserController(userService),
       rooms: new RoomController(roomService),
       bookings: new BookingController(bookingService),
+      eventLog: new EventLogController(eventLog, userService),
     },
     authenticate: createAuthenticate({ tokens, users: storage.users }),
   };

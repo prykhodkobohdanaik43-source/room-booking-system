@@ -6,4 +6,5 @@ describeBookingRepository('InMemoryBookingRepository', async () => ({
   roomId: 'room-1',
   otherRoomId: 'room-2',
   authorId: 'user-1',
+  otherAuthorId: 'user-2',
 }));

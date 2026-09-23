@@ -38,3 +38,12 @@ export function toIsoDay(date) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
+
+// 'YYYY-MM-DD' .. 'YYYY-MM-DD' (обидва дні включно) -> [from, to) у часовому поясі сервера
+export function periodRange(fromDay, toDay) {
+  const start = dayRange(fromDay);
+  const end = dayRange(toDay);
+  if (!start || !end) return null;
+  if (end.from < start.from) return null;
+  return { from: start.from, to: end.to };
+}

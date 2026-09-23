@@ -26,6 +26,20 @@ export class InMemoryBookingRepository extends BookingRepository {
     return new Booking({ ...booking });
   }
 
+  async updateSchedule(booking) {
+    const stored = this.#items.get(booking.id);
+    if (!stored || stored.status !== BookingStatus.ACTIVE) {
+      throw new ConflictError('Бронь уже змінено', 'BOOKING_NOT_ACTIVE');
+    }
+    const taken = [...this.#items.values()].some(
+      (other) => other.id !== booking.id && other.occupiesSlot && other.overlaps(booking),
+    );
+    if (taken) throw new SlotTakenError();
+
+    this.#items.set(booking.id, new Booking({ ...stored, ...booking, status: stored.status }));
+    return new Booking({ ...this.#items.get(booking.id) });
+  }
+
   async findById(id) {
     const booking = this.#items.get(id);
     return booking ? new Booking({ ...booking }) : null;
@@ -42,6 +56,24 @@ export class InMemoryBookingRepository extends BookingRepository {
   async findAwaitingReminder(from, to) {
     return this.#select(
       (b) => b.status === BookingStatus.ACTIVE && !b.reminderSentAt && b.startTime > from && b.startTime <= to,
+    );
+  }
+
+  async findByAuthor(authorId, from) {
+    return this.#select((b) => b.authorId === authorId && b.occupiesSlot && b.endTime > from);
+  }
+
+  async findUpcoming(from) {
+    return this.#select((b) => b.occupiesSlot && b.endTime > from);
+  }
+
+  async findByPeriod(from, to) {
+    return this.#select((b) => b.startTime >= from && b.startTime < to);
+  }
+
+  async findActiveByRoom(roomId, from, to) {
+    return this.#select(
+      (b) => b.roomId === roomId && b.status === BookingStatus.ACTIVE && b.startTime >= from && b.startTime < to,
     );
   }
 

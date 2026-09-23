@@ -4,9 +4,18 @@ import { EventType } from '../eventlog/EventType.js';
 import { Room } from './Room.js';
 
 export class RoomService {
+  #deactivationListeners = [];
+
   constructor({ rooms, eventLog }) {
     this.rooms = rooms;
     this.eventLog = eventLog;
+  }
+
+  // ФВ-26: інші модулі підписуються на деактивацію, не даючи Rooms залежності від себе.
+  // Слухач — об'єкт з методом onRoomDeactivated(room, { from, to }), що повертає кількість скасованих броней.
+  addDeactivationListener(listener) {
+    this.#deactivationListeners.push(listener);
+    return this;
   }
 
   list() {
@@ -35,7 +44,15 @@ export class RoomService {
     room.deactivate(parseDay(from), parseDay(to));
     const saved = await this.rooms.update(room);
     await this.#log(EventType.ROOM_DEACTIVATED, saved, actor);
-    return saved;
+
+    let cancelledBookings = 0;
+    for (const listener of this.#deactivationListeners) {
+      cancelledBookings += await listener.onRoomDeactivated(saved, {
+        from: saved.deactivatedFrom,
+        to: saved.deactivatedTo,
+      });
+    }
+    return { room: saved, cancelledBookings };
   }
 
   async #getOrFail(roomId) {
