@@ -104,13 +104,13 @@ describe('BookingFormPage: серія щотижневих броней (ФВ-24
   });
 });
 
-   describe('BookingFormPage: редагування (ФВ-07)', () => {
-     const day = toIsoDay(addDays(new Date(), 1));
-     const booking = {
-       id: 'b1',
-       roomId: 'r1',
-       startTime: `${day}T10:00:00`,
-       endTime: `${day}T11:00:00`,
+describe('BookingFormPage: редагування (ФВ-07)', () => {
+  const day = toIsoDay(addDays(new Date(), 1));
+  const booking = {
+    id: 'b1',
+    roomId: 'r1',
+    startTime: `${day}T10:00:00`,
+    endTime: `${day}T11:00:00`,
     participantsCount: 3,
     status: 'ACTIVE',
   };
