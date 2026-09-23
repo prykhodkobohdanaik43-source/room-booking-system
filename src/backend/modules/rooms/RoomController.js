@@ -19,6 +19,7 @@ export class RoomController {
 
   deactivate = async (req, res) => {
     const { from, to } = req.body ?? {};
-    res.json(await this.roomService.deactivate(req.params.id, { from, to }, req.user));
+    const { room, cancelledBookings } = await this.roomService.deactivate(req.params.id, { from, to }, req.user);
+    res.json({ ...room, cancelledBookings });
   };
 }

@@ -90,5 +90,122 @@ export function describeBookingRepository(name, setup, describeFn = describe) {
       await repo.update(saved);
       expect(await repo.findAwaitingReminder(at(9, 44), at(10))).toHaveLength(0);
     });
+
+    // ---- Лаб. №5: методи для редагування, «моїх броней», адміністратора і деактивації кімнати
+
+    function draftBy(authorId, { roomId = ids.roomId, start = at(10), end = at(11) } = {}) {
+      return new Booking({ roomId, authorId, startTime: start, endTime: end, participantsCount: 3 });
+    }
+
+    describe('updateSchedule (ФВ-07)', () => {
+      it('переносить бронь на інший час і зберігає зміни', async () => {
+        const saved = await repo.insert(draft());
+        saved.startTime = at(12);
+        saved.endTime = at(13);
+        saved.participantsCount = 2;
+        await repo.updateSchedule(saved);
+
+        expect(await repo.findById(saved.id)).toMatchObject({
+          startTime: at(12),
+          endTime: at(13),
+          participantsCount: 2,
+        });
+      });
+
+      it('дозволяє зсув, що перетинається зі старим часом тієї ж броні', async () => {
+        const saved = await repo.insert(draft());
+        saved.startTime = at(10, 30);
+        saved.endTime = at(11, 30);
+        await expect(repo.updateSchedule(saved)).resolves.toBeTruthy();
+      });
+
+      it('відхиляє перенесення на слот, зайнятий іншою бронню (ФВ-18)', async () => {
+        await repo.insert(draft({ start: at(12), end: at(13) }));
+        const saved = await repo.insert(draft());
+        saved.startTime = at(12, 30);
+        saved.endTime = at(13, 30);
+
+        await expect(repo.updateSchedule(saved)).rejects.toBeInstanceOf(SlotTakenError);
+        expect((await repo.findById(saved.id)).startTime).toEqual(at(10));
+      });
+
+      it('переносить бронь в іншу кімнату', async () => {
+        const saved = await repo.insert(draft());
+        saved.roomId = ids.otherRoomId;
+        await repo.updateSchedule(saved);
+        expect((await repo.findById(saved.id)).roomId).toBe(ids.otherRoomId);
+      });
+
+      it('не змінює бронь, яка вже не «активна»', async () => {
+        const saved = await repo.insert(draft());
+        const stale = await repo.findById(saved.id);
+        saved.status = BookingStatus.CANCELLED;
+        await repo.update(saved);
+
+        stale.startTime = at(12);
+        stale.endTime = at(13);
+        await expect(repo.updateSchedule(stale)).rejects.toBeInstanceOf(ConflictError);
+      });
+    });
+
+    it('findByAuthor повертає лише чинні броні автора, що не завершилися (ФВ-06–ФВ-08)', async () => {
+      const mine = await repo.insert(draftBy(ids.authorId, { start: at(12), end: at(13) }));
+      await repo.insert(draftBy(ids.authorId, { start: at(8), end: at(9) })); // вже завершилась
+      await repo.insert(draftBy(ids.otherAuthorId, { start: at(14), end: at(15) }));
+      const cancelled = await repo.insert(draftBy(ids.authorId, { start: at(16), end: at(17) }));
+      cancelled.status = BookingStatus.CANCELLED;
+      await repo.update(cancelled);
+
+      const found = await repo.findByAuthor(ids.authorId, at(10));
+      expect(found.map((booking) => booking.id)).toEqual([mine.id]);
+    });
+
+    it('findUpcoming повертає чинні броні всіх авторів, що не завершилися (ФВ-09)', async () => {
+      const first = await repo.insert(draftBy(ids.authorId, { start: at(12), end: at(13) }));
+      const second = await repo.insert(draftBy(ids.otherAuthorId, { start: at(14), end: at(15) }));
+      await repo.insert(draftBy(ids.authorId, { start: at(8), end: at(9) }));
+      const cancelled = await repo.insert(
+        draftBy(ids.authorId, { roomId: ids.otherRoomId, start: at(12), end: at(13) }),
+      );
+      cancelled.status = BookingStatus.CANCELLED;
+      await repo.update(cancelled);
+
+      const found = await repo.findUpcoming(at(10));
+      expect(found.map((booking) => booking.id)).toEqual([first.id, second.id]);
+    });
+
+    it('findByPeriod повертає броні всіх чотирьох статусів (ФВ-11)', async () => {
+      const active = await repo.insert(draft({ start: at(9), end: at(10) }));
+      const confirmed = await repo.insert(draft({ start: at(10), end: at(11) }));
+      const cancelled = await repo.insert(draft({ start: at(11), end: at(12) }));
+      const auto = await repo.insert(draft({ start: at(12), end: at(13) }));
+      const outside = await repo.insert(draft({ start: at(20), end: at(21) }));
+      confirmed.status = BookingStatus.CONFIRMED;
+      cancelled.status = BookingStatus.CANCELLED;
+      auto.status = BookingStatus.AUTO_CANCELLED;
+      for (const booking of [confirmed, cancelled, auto]) await repo.update(booking);
+
+      const found = await repo.findByPeriod(at(0), at(18));
+      expect(found.map((booking) => booking.status)).toEqual([
+        BookingStatus.ACTIVE,
+        BookingStatus.CONFIRMED,
+        BookingStatus.CANCELLED,
+        BookingStatus.AUTO_CANCELLED,
+      ]);
+      expect(found.map((booking) => booking.id)).not.toContain(outside.id);
+      expect(found[0].id).toBe(active.id);
+    });
+
+    it('findActiveByRoom повертає лише «активні» броні цієї кімнати в періоді (ФВ-26)', async () => {
+      const target = await repo.insert(draft({ start: at(10), end: at(11) }));
+      await repo.insert(draft({ roomId: ids.otherRoomId }));
+      const confirmed = await repo.insert(draft({ start: at(12), end: at(13) }));
+      confirmed.status = BookingStatus.CONFIRMED;
+      await repo.update(confirmed);
+      await repo.insert(draft({ start: at(20), end: at(21) }));
+
+      const found = await repo.findActiveByRoom(ids.roomId, at(0), at(18));
+      expect(found.map((booking) => booking.id)).toEqual([target.id]);
+    });
   });
 }

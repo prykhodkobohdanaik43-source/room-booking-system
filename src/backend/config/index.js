@@ -19,6 +19,8 @@ export function loadConfig(env = process.env) {
     env: nodeEnv,
     port: int(env.PORT, 3000),
     appUrl: env.APP_URL ?? 'http://localhost:5173',
+    // НФВ-16: за замовчуванням увімкнено лише в production; за проксі потрібен trust proxy
+    requireHttps: env.REQUIRE_HTTPS ? env.REQUIRE_HTTPS === 'true' : nodeEnv === 'production',
     databaseUrl: env.DATABASE_URL || null,
     corporateDomain: (env.CORPORATE_EMAIL_DOMAIN ?? 'example.com').toLowerCase(),
     jwt: {

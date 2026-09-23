@@ -26,13 +26,15 @@ describeBookingRepository(
     );
     const users = await pool.query(
       `INSERT INTO users (full_name, email, role)
-       VALUES ('Олена Коваленко', 'olena.kovalenko@example.com', 'EMPLOYEE') RETURNING id`,
+       VALUES ('Олена Коваленко', 'olena.kovalenko@example.com', 'EMPLOYEE'),
+              ('Андрій Ткачук', 'andrii.tkachuk@example.com', 'EMPLOYEE') RETURNING id`,
     );
     return {
       repo: new PgBookingRepository(pool),
       roomId: rooms.rows[0].id,
       otherRoomId: rooms.rows[1].id,
       authorId: users.rows[0].id,
+      otherAuthorId: users.rows[1].id,
     };
   },
   databaseUrl ? describe : describe.skip,

@@ -136,3 +136,60 @@ describe('Booking.autoCancel (ФВ-20, НФВ-07)', () => {
     expect(own.isOverdue(at(10, 30))).toBe(false);
   });
 });
+
+describe('Booking.reschedule (ФВ-07, ФВ-28)', () => {
+  it('автор змінює час, кімнату й кількість учасників до початку', () => {
+    const item = booking();
+    item.reschedule({ roomId: 'room-2', startTime: at(14), endTime: at(15), participantsCount: 5 }, author, at(9));
+    expect(item).toMatchObject({ roomId: 'room-2', startTime: at(14), endTime: at(15), participantsCount: 5 });
+    expect(item.status).toBe(BookingStatus.ACTIVE);
+  });
+
+  it('незадані поля лишаються як були', () => {
+    const item = booking();
+    item.reschedule({ participantsCount: 4 }, author, at(9));
+    expect(item).toMatchObject({ roomId: 'room-1', startTime: at(10), participantsCount: 4 });
+  });
+
+  it('після зміни часу нагадування надсилається знову', () => {
+    const item = booking({ reminderSentAt: at(9, 45) });
+    item.reschedule({ startTime: at(15), endTime: at(16) }, author, at(9));
+    expect(item.reminderSentAt).toBeNull();
+  });
+
+  it('чужу бронь співробітник і адміністратор редагувати не можуть (ФВ-28)', () => {
+    expect(() => booking().reschedule({ participantsCount: 2 }, colleague, at(9))).toThrow(ForbiddenError);
+    expect(() => booking().reschedule({ participantsCount: 2 }, admin, at(9))).toThrow(ForbiddenError);
+  });
+
+  it('після початку броні редагування недоступне', () => {
+    expect(() => booking().reschedule({ participantsCount: 2 }, author, at(10))).toThrow(ConflictError);
+  });
+
+  it('скасовану бронь редагувати не можна', () => {
+    const item = booking({ status: BookingStatus.CANCELLED });
+    expect(() => item.reschedule({ participantsCount: 2 }, author, at(9))).toThrow(ConflictError);
+  });
+
+  it('відхиляє некоректну кількість учасників (ФВ-05)', () => {
+    expect(() => booking().reschedule({ participantsCount: 0 }, author, at(9))).toThrow(ValidationError);
+  });
+});
+
+describe('Booking.cancelBySystem (ФВ-26)', () => {
+  it('скасовує «активну» бронь з причиною і без користувача-ініціатора', () => {
+    const item = booking();
+    item.cancelBySystem('деактивація кімнати');
+    expect(item).toMatchObject({
+      status: BookingStatus.CANCELLED,
+      cancelReason: 'деактивація кімнати',
+      cancelledBy: null,
+    });
+  });
+
+  it('не скасовує підтверджену бронь', () => {
+    expect(() => booking({ status: BookingStatus.CONFIRMED }).cancelBySystem('деактивація кімнати')).toThrow(
+      ConflictError,
+    );
+  });
+});

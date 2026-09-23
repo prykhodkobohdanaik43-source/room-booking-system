@@ -17,6 +17,11 @@ export class HttpClient {
     return this.#send('GET', path);
   }
 
+  // ФВ-12: файл (CSV) приходить не як JSON, а як Blob
+  getBlob(path) {
+    return this.#send('GET', path, undefined, { as: 'blob' });
+  }
+
   post(path, body) {
     return this.#send('POST', path, body);
   }
@@ -25,7 +30,7 @@ export class HttpClient {
     return this.#send('PATCH', path, body);
   }
 
-  async #send(method, path, body) {
+  async #send(method, path, body, { as = 'json' } = {}) {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers: {
@@ -40,6 +45,7 @@ export class HttpClient {
       const payload = await response.json().catch(() => ({}));
       throw new ApiError(response.status, payload.error);
     }
-    return response.status === 204 ? null : response.json();
+    if (response.status === 204) return null;
+    return as === 'blob' ? response.blob() : response.json();
   }
 }
